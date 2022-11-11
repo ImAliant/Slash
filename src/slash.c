@@ -45,6 +45,29 @@ int cmd_cd(char *arg) {
     return 0;
 }
 
+int last_return_value = 0;
+
+int cmd_pwd(char *arg) {
+    if (strcmp(arg, "-L") == 0) {
+        //TODO
+        printf("TODO: -L\n");
+        return 0;
+    }
+    else if (strcmp(arg, "-P") == 0) {
+        char *cwd = getcwd(NULL, 0);
+        if (cwd == NULL) {
+            perror("getcwd");
+            return -1;
+        }
+        printf("%s\n", cwd);
+        return 0;
+    }
+    else {
+        fprintf(stderr, "pwd: invalid option -- '%s'\n", arg);
+        return -1;
+    }
+}
+
 int slash() {
     while(1) {
         rl_outstream = stderr;
@@ -72,13 +95,13 @@ int slash() {
         if (sscanf(line, "%s %s", cmd, arg) == 2) {
             if (strcmp(cmd, "pwd") == 0)
                 last_return_value = cmd_pwd(arg);
-            else if (strcmp(cmd, "cd") == 0)
-                last_return_value = cmd_cd(arg);
+            else if (strcmp(cmd, "cd") == 0) {
+                //TODO
+            }
         }
         else if (sscanf(line, "%s", line) == 1) {
             if (strcmp(line, "exit") == 0) {
-                free(line);
-                return cmd_exit();
+                //TODO
             }
             else if (strcmp(line, "pwd") == 0) last_return_value = cmd_pwd("-L");
         }
