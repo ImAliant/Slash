@@ -21,7 +21,7 @@ char cwd[MAX_ARG_STRLEN];
 
 char cwd_prompt[26];
 
-void affichage_prompt() {
+void print_prompt() {
     char *cwd = getenv("PWD");
     if (strlen(cwd) > 26) {
         snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
@@ -196,7 +196,7 @@ int slash() {
 }
 
 int main(int argc, char *argv[]) {
-    affichage_prompt(getcwd(NULL, 0));
+    print_prompt();
     slash();
 
     return EXIT_SUCCESS;
