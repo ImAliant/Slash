@@ -1,76 +1,22 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <libgen.h>
 #include <sys/types.h>
-#include <sys/wait.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
 #define MAX_ARGS_NUMBER 4096
-#define MAX_ARGS_STRLEN 4096
-
-int last_return_value = 0;
-
-int cmd_exit() {
-    return last_return_value;
-}
-
-int cmd_pwd(char *arg) {
-    if (strcmp(arg, "-L") == 0) {
-		char *path;
-		path = getcwd(NULL, 0);
-		printf("%s\n", getenv("PWD"));
-        return 0;
-    }
-    else if (strcmp(arg, "-P") == 0) {
-        char *cwd = getcwd(NULL, 0);
-        if (cwd == NULL) {
-            perror("getcwd");
-            return -1;
-        }
-        printf("%s\n", cwd);
-        return 0;
-    }
-    else {
-        fprintf(stderr, "pwd: invalid option -- '%s'\n", arg);
-        return -1;
-    }
-}
-
-int cmd_cd(char *arg) {
-    //TODO
-
-    return 0;
-}
-
-int last_return_value = 0;
-
-int cmd_pwd(char *arg) {
-    if (strcmp(arg, "-L") == 0) {
-        //TODO
-        printf("TODO: -L\n");
-        return 0;
-    }
-    else if (strcmp(arg, "-P") == 0) {
-        char *cwd = getcwd(NULL, 0);
-        if (cwd == NULL) {
-            perror("getcwd");
-            return -1;
-        }
-        printf("%s\n", cwd);
-        return 0;
-    }
-    else {
-        fprintf(stderr, "pwd: invalid option -- '%s'\n", arg);
-        return -1;
-    }
-}
+#define MAX_ARG_STRLEN 4096
 
 int last_return_value = 0;
 
 char cwd[MAX_ARG_STRLEN];
+
+int cmd_exit() {
+    return last_return_value;
+}
 
 int cmd_cd(char *arg, char *ref) {
    
@@ -100,15 +46,8 @@ int cmd_cd(char *arg, char *ref) {
     }
 
     if (strcmp(arg, "-L") == 0 || strcmp(arg, "") == 0) {
-       if (strcmp(ref, "-") == 0) {
-            
-            chdir(getenv("OLDPWD"));
-            
-        }
-        else {
-            chdir(ref);
-          
-        }
+        if (strcmp(ref, "-") == 0) chdir(getenv("OLDPWD"));
+        else chdir(ref);
     }
     else if (strcmp(arg, "-P") == 0) {
         if (strcmp(ref, "-") == 0) {
@@ -119,24 +58,27 @@ int cmd_cd(char *arg, char *ref) {
         }
     }
     
-        getcwd(cwd, sizeof(cwd));
+    getcwd(cwd, sizeof(cwd));
         
-        if (cwd == NULL) {
-            perror("getcwd");
-            return 1;
-        }
-        setenv("OLDPWD",getenv("PWD"),1);
-        setenv("PWD",cwd,1);
+    if (cwd == NULL) {
+        perror("getcwd");
+        return 1;
+    }
+    setenv("OLDPWD",getenv("PWD"),1);
+    setenv("PWD",cwd,1);
     
     return 0;
 }
 
+
 int cmd_pwd(char *arg) {
     if (strcmp(arg, "-L") == 0) {
-        //TODO
-        printf("TODO: -L\n");
+		char *path;
+		path = getcwd(NULL, 0);
+		printf("%s\n", getenv("PWD"));
         return 0;
     }
+
     else if (strcmp(arg, "-P") == 0) {
         char *cwd = getcwd(NULL, 0);
         if (cwd == NULL) {
@@ -144,7 +86,6 @@ int cmd_pwd(char *arg) {
             return 1;
         }
         printf("%s\n", cwd);
-        
         return 0;
     }
     else {
@@ -161,7 +102,7 @@ int slash() {
             perror("malloc");
             return 1;
         }
-        
+
         snprintf(prompt, sizeof(prompt), "[%d]$ ", last_return_value);
         char *line = readline(prompt);
         if (strlen(line) > 0) add_history(line);
@@ -200,7 +141,7 @@ int slash() {
         }
         else if (sscanf(line, "%s", cmd) == 1) {
             if (strcmp(cmd, "exit") == 0) {
-                //TODO
+                return cmd_exit();
             }
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
@@ -209,14 +150,13 @@ int slash() {
                 last_return_value = 127;
             }
         }
+
     }
 
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    
-
     slash();
 
     return EXIT_SUCCESS;
