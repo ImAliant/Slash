@@ -10,12 +10,36 @@
 #define MAX_ARGS_NUMBER 4096
 #define MAX_ARG_STRLEN 4096
 
+#define GREEN "\033[32m"
+#define RED "\033[91m"
+#define CYAN "\033[34m"
+#define DEFAULT "\033[00m"
+
 int last_return_value = 0;
 
 char cwd[MAX_ARG_STRLEN];
 
-int cmd_exit() {
-    return last_return_value;
+char cwd_prompt[26];
+
+void affichage_prompt() {
+    char *cwd = getenv("PWD");
+    if (strlen(cwd) > 26) {
+        snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
+    }
+    else {
+        snprintf(cwd_prompt, sizeof(cwd_prompt), "%s", cwd);
+    }
+}
+
+int cmd_exit(char *val) {
+    int exit_value = atoi(val);
+
+    if (exit_value == -10000) {
+        return last_return_value;
+    }
+    else {
+        return exit_value;
+    }
 }
 
 int cmd_cd(char *arg, char *ref) {
@@ -49,6 +73,7 @@ int cmd_cd(char *arg, char *ref) {
         if (strcmp(ref, "-") == 0) chdir(getenv("OLDPWD"));
         else chdir(ref);
     }
+    /* Fonctionne alors qu'on a rien ajouté */
     else if (strcmp(arg, "-P") == 0) {
         if (strcmp(ref, "-") == 0) {
             //TODO
@@ -66,6 +91,8 @@ int cmd_cd(char *arg, char *ref) {
     }
     setenv("OLDPWD",getenv("PWD"),1);
     setenv("PWD",cwd,1);
+
+    affichage_prompt();
     
     return 0;
 }
@@ -97,13 +124,24 @@ int cmd_pwd(char *arg) {
 int slash() {
     while(1) {
         rl_outstream = stderr;
-        char *prompt = malloc(30*sizeof(char));
+        char *prompt = malloc(50*sizeof(char));
         if (prompt == NULL) {
             perror("malloc");
             return 1;
         }
+        char *color = malloc(10*sizeof(char));
+        if (color == NULL) {
+            perror("malloc");
+            return 1;
+        }
 
-        snprintf(prompt, sizeof(prompt), "[%d]$ ", last_return_value);
+        if (last_return_value == 1 || last_return_value == 127)
+            color = RED;
+        else
+            color = GREEN;
+
+
+        snprintf(prompt, 52*sizeof(char), "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
         char *line = readline(prompt);
         if (strlen(line) > 0) add_history(line);
 
@@ -134,15 +172,16 @@ int slash() {
             else if (strcmp(cmd, "cd") == 0) {
                 last_return_value = cmd_cd("", arg);
             }
+            else if (strcmp(cmd, "exit") == 0) {
+                return cmd_exit(arg);
+            }
             else {
                 fprintf(stderr, "Commande inconnue: %s\n", cmd);
                 last_return_value = 127;
             }
         }
         else if (sscanf(line, "%s", cmd) == 1) {
-            if (strcmp(cmd, "exit") == 0) {
-                return cmd_exit();
-            }
+            if (strcmp(cmd, "exit") == 0) return cmd_exit("-10000");
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
             else {
@@ -157,6 +196,7 @@ int slash() {
 }
 
 int main(int argc, char *argv[]) {
+    affichage_prompt(getcwd(NULL, 0));
     slash();
 
     return EXIT_SUCCESS;
