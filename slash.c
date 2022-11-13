@@ -22,7 +22,7 @@ char cwd[MAX_ARG_STRLEN];
 char cwd_prompt[26];
 
 void print_prompt() {
-    char *cwd = getenv("PWD");
+    char *cwd = getcwd(NULL, 0);
     if (strlen(cwd) > 26) {
         snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
     }
@@ -47,7 +47,7 @@ int cmd_cd(char *arg, char *ref) {
     if (strcmp(ref, "") == 0) {
         chdir(getenv("HOME"));
        
-        return 0;
+        goto code;
     }
    
 
@@ -82,6 +82,8 @@ int cmd_cd(char *arg, char *ref) {
             //TODO
         }
     }
+
+    code: 
     
     getcwd(cwd, sizeof(cwd));
         
@@ -92,7 +94,7 @@ int cmd_cd(char *arg, char *ref) {
     setenv("OLDPWD",getenv("PWD"),1);
     setenv("PWD",cwd,1);
 
-    affichage_prompt();
+    print_prompt();
     
     return 0;
 }
@@ -124,7 +126,7 @@ int cmd_pwd(char *arg) {
 int slash() {
     while(1) {
         rl_outstream = stderr;
-        char *prompt = malloc(50*sizeof(char));
+        char *prompt = malloc(55*sizeof(char));
         if (prompt == NULL) {
             perror("malloc");
             return 1;
@@ -141,7 +143,7 @@ int slash() {
             color = GREEN;
 
 
-        snprintf(prompt, 52*sizeof(char), "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
+        snprintf(prompt, 55*sizeof(char), "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
         char *line = readline(prompt);
         if (strlen(line) > 0) add_history(line);
 
@@ -192,12 +194,11 @@ int slash() {
 
     }
 
-    return 0;
+    return last_return_value;
 }
 
 int main(int argc, char *argv[]) {
     print_prompt();
-    slash();
-
-    return EXIT_SUCCESS;
+   
+    return slash();
 }
