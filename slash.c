@@ -53,10 +53,11 @@ int cmd_cd(char *arg, char *ref) {
    
 
     struct stat st;
-    if (strcmp(ref, "-") != 0 && ( stat(ref, &st) == -1)) {
-		fprintf(stderr, "%s", system("ls -la"));
-        fprintf(stderr, "cd: %s: No such file or directory\n", ref);
-        return 1;
+    
+    if (strcmp(ref, "-") != 0 && ( lstat(ref, &st) == -1) ) {
+		fprintf(stderr, "%s\n", getcwd(NULL,0));
+          fprintf(stderr, "cd: %s: No such file or directory\n", ref);
+          return 1;
     } 
     
     if (strcmp(ref, "-") != 0) {
@@ -65,7 +66,14 @@ int cmd_cd(char *arg, char *ref) {
                 fprintf(stderr, "cd: %s: Permission denied\n", ref);
                 return 1;
             }
-        } else {
+        }
+        else if (S_ISLNK(st.st_mode)) {
+            if (chdir(ref) == -1) {
+                fprintf(stderr, "cd: %s: Permission denied\n", ref);
+                return 1;
+            }
+        }  
+        else {
             fprintf(stderr, "cd: %s: Not a directory\n", ref);
             return 1;
         }
@@ -77,17 +85,15 @@ int cmd_cd(char *arg, char *ref) {
 			strcpy(cwd,getenv("OLDPWD"));
 		}
         else if (strcmp(ref, "..") == 0) {
-			chdir("..");
 			strcpy(cwd,getenv("PWD"));
 			while (1){
 				if (cwd[strlen(cwd)-1] == '/') {
 					cwd[strlen(cwd)-1] = '\0' ;
 					break;
-			      }
-			else cwd[strlen(cwd)-1] = '\0'; 
+			    }
+			    else cwd[strlen(cwd)-1] = '\0'; 
 		    }
-		    
-			
+		    chdir(cwd);
 		}
         else{
 			if (ref[0]!='/'){
@@ -96,7 +102,6 @@ int cmd_cd(char *arg, char *ref) {
 			 strcat(cwd,"/");
 			 strcat(cwd,ref);
 		     }
-		     //else if (S_ISLNK(st.st_mode)){
 				    
 		     else{
 				 strcpy(cwd,ref);
@@ -111,6 +116,10 @@ int cmd_cd(char *arg, char *ref) {
             realpath(ref,path);
             chdir(path);
         }
+        else if (strcmp(ref, "..") == 0) {
+			strcpy(cwd,getcwd(NULL,0));
+		    chdir(cwd);
+		}
         else {
             char path[strlen(ref)];
             realpath(ref,path);
