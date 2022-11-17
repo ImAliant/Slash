@@ -22,7 +22,7 @@ char cwd[MAX_ARG_STRLEN];
 char cwd_prompt[26];
 
 void print_prompt() {
-    char *cwd = getcwd(NULL, 0);
+    char *cwd = getenv("PWD");
     if (strlen(cwd) > 26) {
         snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
     }
@@ -46,13 +46,15 @@ int cmd_cd(char *arg, char *ref) {
    
     if (strcmp(ref, "") == 0) {
         chdir(getenv("HOME"));
+        strcpy(cwd,getenv("HOME"));
        
         goto code;
     }
    
 
     struct stat st;
-    if (strcmp(ref, "-") != 0 && stat(ref, &st) == -1) {
+    if (strcmp(ref, "-") != 0 && ( stat(ref, &st) == -1)) {
+		fprintf(stderr, "%s", system("ls -la"));
         fprintf(stderr, "cd: %s: No such file or directory\n", ref);
         return 1;
     } 
@@ -70,27 +72,61 @@ int cmd_cd(char *arg, char *ref) {
     }
 
     if (strcmp(arg, "-L") == 0 || strcmp(arg, "") == 0) {
-        if (strcmp(ref, "-") == 0) chdir(getenv("OLDPWD"));
-        else chdir(ref);
-    }
-    /* Fonctionne alors qu'on a rien ajouté */
-    else if (strcmp(arg, "-P") == 0) {
         if (strcmp(ref, "-") == 0) {
-            //TODO
+			chdir(getenv("OLDPWD"));
+			strcpy(cwd,getenv("OLDPWD"));
+		}
+        else if (strcmp(ref, "..") == 0) {
+			chdir("..");
+			strcpy(cwd,getenv("PWD"));
+			while (1){
+				if (cwd[strlen(cwd)-1] == '/') {
+					cwd[strlen(cwd)-1] = '\0' ;
+					break;
+			      }
+			else cwd[strlen(cwd)-1] = '\0'; 
+		    }
+		    
+			
+		}
+        else{
+			if (ref[0]!='/'){
+			 chdir(ref);
+			 strcpy(cwd,getenv("PWD"));
+			 strcat(cwd,"/");
+			 strcat(cwd,ref);
+		     }
+		     //else if (S_ISLNK(st.st_mode)){
+				    
+		     else{
+				 strcpy(cwd,ref);
+				 chdir(cwd);
+			 }
+		   }
+				
+    }
+    else if (strcmp(arg, "-P") == 0) {
+       if (strcmp(ref, "-") == 0) {
+            char path[strlen(getenv("OLDPWD"))];
+            realpath(ref,path);
+            chdir(path);
         }
         else {
-            //TODO
+            char path[strlen(ref)];
+            realpath(ref,path);
+            chdir(path);
         }
     }
 
     code: 
     
-    getcwd(cwd, sizeof(cwd));
+    /*getcwd(cwd, sizeof(cwd));
         
     if (cwd == NULL) {
         perror("getcwd");
         return 1;
-    }
+    }*/
+    
     setenv("OLDPWD",getenv("PWD"),1);
     setenv("PWD",cwd,1);
 
@@ -101,9 +137,7 @@ int cmd_cd(char *arg, char *ref) {
 
 
 int cmd_pwd(char *arg) {
-    if (strcmp(arg, "-L") == 0) {
-		char *path;
-		path = getcwd(NULL, 0);
+    if (strcmp(arg, "-L") == 0 ||strcmp(arg, "") == 0  ) {
 		printf("%s\n", getenv("PWD"));
         return 0;
     }
