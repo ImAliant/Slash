@@ -114,7 +114,6 @@ int cmd_cd(char *arg, char *ref) {
 			 strcat(cwd,ref);
 		     }
 		     else if ( ref[0] == '.' && ref[1] == '.' ) {
-				 /////
 				 char *path=(char *)malloc(MAX_ARG_STRLEN);
 				 char *backuppwd=(char *)malloc(MAX_ARG_STRLEN);
 				 strcpy(backuppwd,getcwd(NULL,0));
@@ -161,24 +160,16 @@ int cmd_cd(char *arg, char *ref) {
 		}
         else {
             char path[strlen(ref)];
-            realpath(ref,path);
+            readlink(ref, path, sizeof(path));
             chdir(path);
+            strcpy(cwd, getcwd(NULL,0));
         }
     }
 
     code: 
     
-    /*getcwd(cwd, sizeof(cwd));
-        
-    if (cwd == NULL) {
-        perror("getcwd");
-        return 1;
-    }*/
-    
     setenv("OLDPWD",getenv("PWD"),1);
     setenv("PWD",cwd,1);
-    //char path[MAX_ARG_STRLEN];
-    //setenv("CWD",realpath(cwd,path),1);
 
     print_prompt();
     
