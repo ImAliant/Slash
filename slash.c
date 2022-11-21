@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -22,7 +24,7 @@ char cwd[MAX_ARG_STRLEN];
 char cwd_prompt[26];
 
 void print_prompt() {
-    char *cwd = getcwd(NULL, 0);
+    char *cwd = getenv("PWD");
     if (strlen(cwd) > 26) {
         snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
     }
@@ -43,19 +45,29 @@ int cmd_exit(char *val) {
 }
 
 int cmd_cd(char *arg, char *ref) {
-   
+	
+	
     if (strcmp(ref, "") == 0) {
         chdir(getenv("HOME"));
+        strcpy(cwd,getenv("HOME"));
        
         goto code;
     }
    
 
     struct stat st;
-    if (strcmp(ref, "-") != 0 && stat(ref, &st) == -1) {
-        fprintf(stderr, "cd: %s: No such file or directory\n", ref);
+    stat(ref, &st);
+    DIR* dir = opendir(ref);
+    if( (strcmp(ref, "-")) != 0 && (ENOENT == errno)) {
+		fprintf(stderr, "cd: %s: No such file or directory\n", ref);
         return 1;
-    } 
+    }
+    closedir(dir);
+    /*if (strcmp(ref, "-") != 0 && ( stat(ref, &st) == -1) ) {
+		  fprintf(stderr, "%s\n", getcwd(NULL,0));
+          fprintf(stderr, "cd: %s: No such file or directory\n", ref);
+          return 1;
+    } */
     
     if (strcmp(ref, "-") != 0) {
         if (S_ISDIR(st.st_mode)) {
@@ -63,36 +75,110 @@ int cmd_cd(char *arg, char *ref) {
                 fprintf(stderr, "cd: %s: Permission denied\n", ref);
                 return 1;
             }
-        } else {
+        }
+        else if (S_ISLNK(st.st_mode)) {
+            if (chdir(ref) == -1) {
+                fprintf(stderr, "cd: %s: Permission denied\n", ref);
+                return 1;
+            }
+        }  
+        else {
             fprintf(stderr, "cd: %s: Not a directory\n", ref);
             return 1;
         }
     }
 
     if (strcmp(arg, "-L") == 0 || strcmp(arg, "") == 0) {
-        if (strcmp(ref, "-") == 0) chdir(getenv("OLDPWD"));
-        else chdir(ref);
-    }
-    /* Fonctionne alors qu'on a rien ajouté */
-    else if (strcmp(arg, "-P") == 0) {
         if (strcmp(ref, "-") == 0) {
-            //TODO
+			chdir(getenv("OLDPWD"));
+			strcpy(cwd,getenv("OLDPWD"));
+		}
+        else if (strcmp(ref, "..") == 0) {
+			//chdir("..");
+			strcpy(cwd,getenv("PWD"));
+			while (1){
+				if (cwd[strlen(cwd)-1] == '/') {
+					cwd[strlen(cwd)-1] = '\0' ;
+					break;
+			    }
+			    else cwd[strlen(cwd)-1] = '\0'; 
+		    }
+		    chdir(cwd);
+		    //setenv("PWD",cwd,1);
+		}
+        else{
+			if (ref[0]!='/' && ref[0] != '.' && ref[1] != '.' ){
+			 chdir(ref);
+			 strcpy(cwd,getenv("PWD"));
+			 strcat(cwd,"/");
+			 strcat(cwd,ref);
+		     }
+		     else if ( ref[0] == '.' && ref[1] == '.' ) {
+				 /////
+				 char *path=(char *)malloc(MAX_ARG_STRLEN);
+				 char *backuppwd=(char *)malloc(MAX_ARG_STRLEN);
+				 strcpy(backuppwd,getcwd(NULL,0));
+				 strcpy(path,ref);
+				 while ( path[0]== '.' && path[1] == '.' ) {
+					 strcpy(cwd,getenv("PWD"));
+			         while (1){
+				       if (cwd[strlen(cwd)-1] == '/') {
+					   cwd[strlen(cwd)-1] = '\0' ;
+					   break;
+			           }
+			           else cwd[strlen(cwd)-1] = '\0'; 
+		             }
+		             chdir(cwd);
+		             setenv("PWD",cwd,1);
+					 path=path+3;
+			     }
+			     if ( chdir(path) != -1 ) strcat(cwd,path);
+			     else {
+					 chdir(backuppwd);
+					 strcpy(cwd,backuppwd);
+		     }
+		    chdir(backuppwd);
+		    setenv("PWD",backuppwd,1);
+					 
+			 }
+				    
+		     else{
+				 //if ( ref[strlen(ref)-1] == '/' ) ref[strlen(ref)-1] = '\0';
+				 strcpy(cwd,ref);
+				 chdir(cwd);
+			 }
+		   }
+    }
+    else if (strcmp(arg, "-P") == 0) {
+       if (strcmp(ref, "-") == 0) {
+            char path[strlen(getenv("OLDPWD"))];
+            realpath(ref,path);
+            chdir(path);
         }
+        else if (strcmp(ref, "..") == 0) {
+			strcpy(cwd,getcwd(NULL,0));
+		    chdir(cwd);
+		}
         else {
-            //TODO
+            char path[strlen(ref)];
+            realpath(ref,path);
+            chdir(path);
         }
     }
 
     code: 
     
-    getcwd(cwd, sizeof(cwd));
+    /*getcwd(cwd, sizeof(cwd));
         
     if (cwd == NULL) {
         perror("getcwd");
         return 1;
-    }
+    }*/
+    
     setenv("OLDPWD",getenv("PWD"),1);
     setenv("PWD",cwd,1);
+    //char path[MAX_ARG_STRLEN];
+    //setenv("CWD",realpath(cwd,path),1);
 
     print_prompt();
     
@@ -101,9 +187,7 @@ int cmd_cd(char *arg, char *ref) {
 
 
 int cmd_pwd(char *arg) {
-    if (strcmp(arg, "-L") == 0) {
-		char *path;
-		path = getcwd(NULL, 0);
+    if (strcmp(arg, "-L") == 0 ||strcmp(arg, "") == 0  ) {
 		printf("%s\n", getenv("PWD"));
         return 0;
     }
