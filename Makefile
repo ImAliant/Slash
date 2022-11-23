@@ -1,8 +1,12 @@
 CC = gcc
-OBJ = slash.o
+DEPS = cmd_interne.h
+OBJ = cmd_interne.o slash.o
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 slash: $(OBJ)
-	$(CC) -o $@ $^ -lreadline
+	$(CC) -o $@ $^ -lreadline $(CFLAGS)
 
 clean:
 	@echo "Nettoyage ..."

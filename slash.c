@@ -4,129 +4,51 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#define MAX_ARGS_NUMBER 4096
-#define MAX_ARG_STRLEN 4096
+#include "cmd_interne.h"
 
-#define GREEN "\033[32m"
-#define RED "\033[91m"
-#define CYAN "\033[34m"
+#define GREEN   "\033[32m"
+#define RED     "\033[91m"
+#define CYAN    "\033[34m"
 #define DEFAULT "\033[00m"
 
 int last_return_value = 0;
+char *cwd_prompt;
 
-char cwd[MAX_ARG_STRLEN];
-
-char cwd_prompt[26];
-
-void print_prompt() {
-    char *cwd = getcwd(NULL, 0);
-    if (strlen(cwd) > 26) {
-        snprintf(cwd_prompt, sizeof(cwd_prompt), "...%s", cwd + strlen(cwd) - 22);
-    }
-    else {
-        snprintf(cwd_prompt, sizeof(cwd_prompt), "%s", cwd);
-    }
-}
-
-int cmd_exit(char *val) {
-    int exit_value = atoi(val);
-
-    if (exit_value == -10000) {
-        return last_return_value;
-    }
-    else {
-        return exit_value;
-    }
-}
-
-int cmd_cd(char *arg, char *ref) {
-   
-    if (strcmp(ref, "") == 0) {
-        chdir(getenv("HOME"));
-       
-        goto code;
-    }
-   
-
-    struct stat st;
-    if (strcmp(ref, "-") != 0 && stat(ref, &st) == -1) {
-        fprintf(stderr, "cd: %s: No such file or directory\n", ref);
-        return 1;
-    } 
+int print_prompt() {
+    char *cwd = getenv("PWD");
     
-    if (strcmp(ref, "-") != 0) {
-        if (S_ISDIR(st.st_mode)) {
-            if (chdir(ref) == -1) {
-                fprintf(stderr, "cd: %s: Permission denied\n", ref);
-                return 1;
-            }
-        } else {
-            fprintf(stderr, "cd: %s: Not a directory\n", ref);
-            return 1;
-        }
-    }
-
-    if (strcmp(arg, "-L") == 0 || strcmp(arg, "") == 0) {
-        if (strcmp(ref, "-") == 0) chdir(getenv("OLDPWD"));
-        else chdir(ref);
-    }
-    /* Fonctionne alors qu'on a rien ajouté */
-    else if (strcmp(arg, "-P") == 0) {
-        if (strcmp(ref, "-") == 0) {
-            //TODO
-        }
-        else {
-            //TODO
-        }
-    }
-
-    code: 
-    
-    getcwd(cwd, sizeof(cwd));
-        
-    if (cwd == NULL) {
-        perror("getcwd");
+    cwd_prompt = malloc(30*sizeof(char));
+    if (!cwd_prompt) {
+        perror("malloc");
         return 1;
     }
-    setenv("OLDPWD",getenv("PWD"),1);
-    setenv("PWD",cwd,1);
 
+    if (strlen(cwd) > 26) 
+        sprintf(cwd_prompt, "...%s", cwd + strlen(cwd) - 22);
+    else
+        sprintf(cwd_prompt, "%s", cwd);
+}
+
+int init() {
+    rl_initialize();
     print_prompt();
-    
-    return 0;
 }
 
-
-int cmd_pwd(char *arg) {
-    if (strcmp(arg, "-L") == 0) {
-		char *path;
-		path = getcwd(NULL, 0);
-		printf("%s\n", getenv("PWD"));
-        return 0;
-    }
-
-    else if (strcmp(arg, "-P") == 0) {
-        char *cwd = getcwd(NULL, 0);
-        if (cwd == NULL) {
-            perror("getcwd");
-            return 1;
-        }
-        printf("%s\n", cwd);
-        return 0;
-    }
-    else {
-        fprintf(stderr, "pwd: invalid option -- '%s'\n", arg);
-        return 1;
-    }
+void end() {
+    free(cwd_prompt);
 }
 
 int slash() {
+    init();
+
     while(1) {
         rl_outstream = stderr;
-        char *prompt = malloc(55*sizeof(char));
+        char *prompt = malloc(45*sizeof(char));
         if (prompt == NULL) {
             perror("malloc");
             return 1;
@@ -142,9 +64,14 @@ int slash() {
         else
             color = GREEN;
 
-
-        snprintf(prompt, 55*sizeof(char), "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
+        sprintf(prompt, "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
         char *line = readline(prompt);
+        
+        if(!line) {
+            free(line);
+            exit(last_return_value);
+        }
+
         if (strlen(line) > 0) add_history(line);
 
         char *cmd = malloc(30*sizeof(char));
@@ -175,7 +102,8 @@ int slash() {
                 last_return_value = cmd_cd("", arg);
             }
             else if (strcmp(cmd, "exit") == 0) {
-                return cmd_exit(arg);
+                int val = atoi(arg);
+                return cmd_exit(val);
             }
             else {
                 fprintf(stderr, "Commande inconnue: %s\n", cmd);
@@ -183,7 +111,7 @@ int slash() {
             }
         }
         else if (sscanf(line, "%s", cmd) == 1) {
-            if (strcmp(cmd, "exit") == 0) return cmd_exit("-10000");
+            if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
             else {
@@ -191,14 +119,19 @@ int slash() {
                 last_return_value = 127;
             }
         }
+        free(line);
+        free(cmd);
+        free(arg);
+        free(ref);
+        free(prompt);
 
+        print_prompt();
     }
+    end();
 
     return last_return_value;
 }
 
 int main(int argc, char *argv[]) {
-    print_prompt();
-   
     return slash();
 }
