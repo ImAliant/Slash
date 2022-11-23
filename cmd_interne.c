@@ -11,9 +11,6 @@
 
 #include "cmd_interne.h"
 
-#define MAX_ARGS_NUMBER 4096
-#define MAX_ARG_STRLEN 4096
-
 int cmd_exit(int val) {
     return val;
 }
@@ -40,11 +37,6 @@ int cmd_cd(char *arg, char *ref) {
         return 1;
     }
     closedir(dir);
-    /*if (strcmp(ref, "-") != 0 && ( stat(ref, &st) == -1) ) {
-		  fprintf(stderr, "%s\n", getcwd(NULL,0));
-          fprintf(stderr, "cd: %s: No such file or directory\n", ref);
-          return 1;
-    } */
     
     if (strcmp(ref, "-") != 0) {
         if (S_ISDIR(st.st_mode)) {
@@ -94,18 +86,14 @@ int cmd_cd(char *arg, char *ref) {
 			    strcat(cwd,ref);
 		    }
 		    else if ( ref[0] == '.' && ref[1] == '.' ) {
-				char *path=(char *)malloc(MAX_ARG_STRLEN);
+                char *path = malloc(strlen(ref)+1);
                 if (!path) {
                     perror("malloc");
                     return 1;
                 }
-				char *backuppwd=(char *)malloc(MAX_ARG_STRLEN);
-                if (!backuppwd) {
-                    perror("malloc");
-                    return 1;
-                }
-                
-                getcwd(backuppwd,MAX_ARG_STRLEN);
+
+                char *backuppwd = getcwd(NULL,0);
+
 				strcpy(path,ref);
 				while (path[0]== '.' && path[1] == '.') {
 					strcpy(cwd,getenv("PWD"));
@@ -120,13 +108,17 @@ int cmd_cd(char *arg, char *ref) {
 		            setenv("PWD",cwd,1);
 					path=path+3;
 			    }
-			    if (chdir(path) != -1) strcat(cwd,path);
+			    if (chdir(path) != -1) {
+                    strcat(cwd,path);
+                    free(path);
+                }   
 			    else {
 					chdir(backuppwd);
 					strcpy(cwd,backuppwd);
 	            }
 		        chdir(backuppwd);
 		        setenv("PWD",backuppwd,1);
+                free(backuppwd);
 		    }
 		    else{
 				strcpy(cwd,ref);

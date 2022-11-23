@@ -22,7 +22,6 @@ char *cwd_prompt;
 int print_prompt() {
     char *cwd = getenv("PWD");
     
-    cwd_prompt = malloc(30*sizeof(char));
     if (!cwd_prompt) {
         perror("malloc");
         return 1;
@@ -36,6 +35,11 @@ int print_prompt() {
 
 int init() {
     rl_initialize();
+    cwd_prompt = malloc(30*sizeof(char));
+    if (!cwd_prompt) {
+        perror("malloc");
+        return 1;
+    }
     print_prompt();
 }
 
@@ -48,16 +52,12 @@ int slash() {
 
     while(1) {
         rl_outstream = stderr;
-        char *prompt = malloc(45*sizeof(char));
+        char *prompt = malloc(100*sizeof(char));
         if (prompt == NULL) {
             perror("malloc");
             return 1;
         }
-        char *color = malloc(10*sizeof(char));
-        if (color == NULL) {
-            perror("malloc");
-            return 1;
-        }
+        char *color;
 
         if (last_return_value == 1 || last_return_value == 127)
             color = RED;
@@ -103,6 +103,13 @@ int slash() {
             }
             else if (strcmp(cmd, "exit") == 0) {
                 int val = atoi(arg);
+
+                free(line);
+                free(cmd);
+                free(arg);
+                free(ref);
+                free(prompt);
+
                 return cmd_exit(val);
             }
             else {
