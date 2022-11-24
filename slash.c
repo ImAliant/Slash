@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
+#include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -42,6 +43,9 @@ void print_prompt() {
 void init() {
     rl_initialize();
     
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTERM, SIG_IGN);
+
     cwd_prompt = malloc(100*sizeof(char));
     if (!cwd_prompt) {
         perror("malloc");
