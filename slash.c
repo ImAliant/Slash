@@ -16,15 +16,18 @@
 #define CYAN    "\033[34m"
 #define DEFAULT "\033[00m"
 
-int last_return_value = 0;
+int last_return_value;
 char *cwd_prompt;
 
-int print_prompt() {
+/*
+ * Affiche le répertoire de travail courant.
+ */
+void print_prompt() {
     char *cwd = getenv("PWD");
     
     if (!cwd_prompt) {
         perror("malloc");
-        return 1;
+        cmd_exit(1);
     }
 
     if (strlen(cwd) > 26) 
@@ -33,20 +36,38 @@ int print_prompt() {
         sprintf(cwd_prompt, "%s", cwd);
 }
 
-int init() {
+/*
+ * Initialise le prompt du shell et les variables globales.
+ */
+void init() {
     rl_initialize();
+    
     cwd_prompt = malloc(100*sizeof(char));
     if (!cwd_prompt) {
         perror("malloc");
-        return 1;
+        cmd_exit(1);
     }
+
+    last_return_value = 0;
+    
     print_prompt();
 }
 
+/*
+ * Libère la mémoire allouée a la variable globale cwd_prompt.
+ */
 void end() {
     free(cwd_prompt);
 }
 
+/*
+ * Interpreteur de commande qui permet d'exécuter des commandes internes. 
+ * Les différentes commandes internes sont :
+ *        - exit
+ *        - cd
+ *        - pwd
+ * @return last_return_value : valeur de retour de la dernière commande exécutée ou la valeur attribué a la commande exit.
+ */
 int slash() {
     init();
 
@@ -139,6 +160,9 @@ int slash() {
     return last_return_value;
 }
 
+/*
+ * Execute l'interpreteur de commande.
+ */
 int main(int argc, char *argv[]) {
     return slash();
 }
