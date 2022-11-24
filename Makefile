@@ -3,10 +3,10 @@ DEPS = cmd_interne.h
 OBJ = cmd_interne.o slash.o
 
 %.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) -Wall -c -o $@ $< $(CFLAGS)
 
 slash: $(OBJ)
-	$(CC) -o $@ $^ -lreadline $(CFLAGS)
+	$(CC) -Wall -o $@ $^ -lreadline $(CFLAGS)
 
 clean:
 	@echo "Nettoyage ..."

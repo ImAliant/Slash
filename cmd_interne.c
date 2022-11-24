@@ -106,19 +106,18 @@ int cmd_cd(char *arg, char *ref) {
 		            }
 		            chdir(cwd);
 		            setenv("PWD",cwd,1);
-					path=path+3;
+                    memmove(path, path+3, strlen(path+3)+1);
 			    }
 			    if (chdir(path) != -1) {
                     strcat(cwd,path);
-                    free(path);
                 }   
 			    else {
 					chdir(backuppwd);
 					strcpy(cwd,backuppwd);
 	            }
-		        chdir(backuppwd);
 		        setenv("PWD",backuppwd,1);
                 free(backuppwd);
+                free(path);
 		    }
 		    else{
 				strcpy(cwd,ref);
@@ -134,7 +133,7 @@ int cmd_cd(char *arg, char *ref) {
         }
         else if (strcmp(ref, "..") == 0) {
             getcwd(cwd,MAX_ARG_STRLEN);
-		    chdir(cwd);
+            chdir(cwd);
 		}
         else {
             char path[strlen(ref)];

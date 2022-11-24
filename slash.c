@@ -35,7 +35,7 @@ int print_prompt() {
 
 int init() {
     rl_initialize();
-    cwd_prompt = malloc(30*sizeof(char));
+    cwd_prompt = malloc(100*sizeof(char));
     if (!cwd_prompt) {
         perror("malloc");
         return 1;
@@ -74,17 +74,17 @@ int slash() {
 
         if (strlen(line) > 0) add_history(line);
 
-        char *cmd = malloc(30*sizeof(char));
+        char *cmd = malloc(100*sizeof(char));
         if (cmd == NULL) {
             perror("malloc");
             return 1;
         }
-        char *arg = malloc(30*sizeof(char));
+        char *arg = malloc(100*sizeof(char));
         if (arg == NULL) {
             perror("malloc");
             return 1;
         }
-        char *ref = malloc(30*sizeof(char));
+        char *ref = malloc(100*sizeof(char));
         if (ref == NULL) {
             perror("malloc");
             return 1;
