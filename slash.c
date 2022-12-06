@@ -5,12 +5,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <libgen.h>
 #include <errno.h>
 #include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
 #include "cmd_interne.h"
+//#include "cmd_extern.h"
 
 #define GREEN   "\033[32m"
 #define RED     "\033[91m"
@@ -119,6 +121,24 @@ int slash() {
             if (strcmp(cmd, "cd") == 0) {
                 last_return_value = cmd_cd(arg, ref);
             }
+            else if (strstr(cmd,"commands")!=NULL){
+				int stat;
+				pid_t r=fork();
+				if (r==0) {
+					if (strstr(basename(cmd),"ls")!=NULL){
+						char *argv[3];
+				        argv[0]="ls";
+				        argv[1]=arg;
+				        argv[2]=ref;
+				        execvp(argv[0],argv);
+					}
+			   }
+			   else{
+				   wait(&stat);
+				   if (WIFEXITED(stat))
+				   last_return_value=WEXITSTATUS(stat);
+				}
+			}
         }
         else if (sscanf(line, "%s %s", cmd, arg) == 2) {
             if (strcmp(cmd, "pwd") == 0)
@@ -137,6 +157,20 @@ int slash() {
 
                 return cmd_exit(val);
             }
+            else if (strcmp(cmd, "ls") == 0) {
+				int stat;
+				pid_t r=fork();
+				if (r==0) {
+				  char *argv[2];
+				  argv[0]="ls";
+				  argv[1]=arg;
+				  last_return_value=execvp(argv[0],argv);
+			   }
+			   else {
+				   wait(&stat);
+				   last_return_value=WEXITSTATUS(stat);
+			   }
+			}
             else {
                 fprintf(stderr, "Commande inconnue: %s\n", cmd);
                 last_return_value = 127;
@@ -146,8 +180,40 @@ int slash() {
             if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
-            else if (strstr(cmd, "true") != NULL) last_return_value=0; // A rajouter surement dans cmd_extern et effacer ici, juste pour
-			else if (strstr(cmd, "false") != NULL) last_return_value=1; // passer les 1er test jalon_2
+            else if (strstr(cmd, "true") != NULL){
+				pid_t r=fork();
+				if (r==0) {
+				  char *argv[1];
+				  argv[0]="true";
+				  last_return_value=execvp(argv[0],argv);
+			    }
+			     else {
+					 wait(NULL);
+					 last_return_value=0;
+				 }
+			   }                                                      // A rajouter surement dans cmd_extern et effacer ici,juste pour
+			else if (strstr(cmd, "false") != NULL) {                  // passer les 1er test jalon_2
+				pid_t r=fork();
+				if (r==0) {
+				  char *argv[1];
+				  argv[0]="false";
+				  execvp(argv[0],argv);
+			    }
+			    else {
+					wait(NULL);
+					last_return_value=1;
+				}
+			 }
+			else if (strcmp(cmd, "cat") == 0) {
+				pid_t r=fork();
+				if (r==0) {
+				  char *argv[2];
+				  argv[0]="cat";
+				  argv[1]=NULL;
+				  last_return_value=execvp(argv[0],argv);
+			   }
+			   else wait(NULL);
+			}
             else {
                 fprintf(stderr, "Commande inconnue: %s\n", cmd);
                 last_return_value = 127;
