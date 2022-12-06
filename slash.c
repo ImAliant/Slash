@@ -126,8 +126,8 @@ int slash() {
 				pid_t r=fork();
 				if (r==0) {
 					if (strstr(basename(cmd),"ls")!=NULL){
-						char *argv[3];
-				        argv[0]="ls";
+					    const char *argv[3];
+				        argv[0]=cmd;
 				        argv[1]=arg;
 				        argv[2]=ref;
 				        execvp(argv[0],argv);
@@ -138,6 +138,21 @@ int slash() {
 				   if (WIFEXITED(stat))
 				   last_return_value=WEXITSTATUS(stat);
 				}
+			}
+			else if (strcmp(cmd, "ls") == 0) {
+				int stat;
+				pid_t r=fork();
+				if (r==0) {
+				  const char *argv[]= { "ls",arg,ref,NULL};
+				  //argv[0]="ls";
+				  //argv[1]=arg;
+				  //argv[2]=ref;
+				  execvp(argv[0],argv);
+			   }
+			   else {
+				   wait(&stat);
+				   last_return_value=WEXITSTATUS(stat);
+			   }
 			}
         }
         else if (sscanf(line, "%s %s", cmd, arg) == 2) {
