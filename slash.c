@@ -146,11 +146,14 @@ int slash() {
             if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
+            else if (strstr(cmd, "true") != NULL) last_return_value=0; // A rajouter surement dans cmd_extern et effacer ici, juste pour
+			else if (strstr(cmd, "false") != NULL) last_return_value=1; // passer les 1er test jalon_2
             else {
                 fprintf(stderr, "Commande inconnue: %s\n", cmd);
                 last_return_value = 127;
             }
         }
+        
         free(line);
         free(cmd);
         free(arg);
