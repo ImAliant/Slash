@@ -116,8 +116,23 @@ int slash() {
             perror("malloc");
             return 1;
         }
-        
-        if (sscanf(line, "%s %s %s", cmd, arg, ref) == 3) {
+        if (strstr(line,"echo")){ 
+			int stat;
+		    pid_t r=fork();
+			if (r==0) {
+			   const char *argv[]={ "echo",line+5 };
+			  // argv[0]="echo";
+			 //  strcpy(argv[1],line+4);
+			   execvp(argv[0],argv);
+			}
+			 else{
+				 wait(&stat);
+				 if (WIFEXITED(stat))
+				 last_return_value=WEXITSTATUS(stat);
+		     }
+		  }
+		  
+         else if (sscanf(line, "%s %s %s", cmd, arg, ref) == 3) {
             if (strcmp(cmd, "cd") == 0) {
                 last_return_value = cmd_cd(arg, ref);
             }
