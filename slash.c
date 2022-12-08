@@ -66,7 +66,7 @@ void end() {
 }
 
 /*
- * Interpreteur de commande qui permet d'exécuter des commandes internes. 
+ * Interpreteur de commande qui permet d'exécuter des commandes internes et externes. 
  * Les différentes commandes internes sont :
  *        - exit
  *        - cd
@@ -85,10 +85,10 @@ int slash() {
         }
         char *color;
 
-        if (last_return_value == 1 || last_return_value == 127)
-            color = RED;
-        else
+        if (last_return_value == 0)
             color = GREEN;
+        else
+            color = RED;
 
         sprintf(prompt, "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
         char *line = readline(prompt);
@@ -169,6 +169,7 @@ int slash() {
             }
         }
         else {
+            int stat;
             pid_t pid = fork();
             switch (pid) {
                 case -1:
@@ -202,14 +203,10 @@ int slash() {
                         perror("malloc");
                         return 1;
                     }
-                    sprintf(path, "/bin/%s", arg[0]);
-                    last_return_value = execv(path, arg);
-                    if (last_return_value == -1) {
-                        perror("Commande inconnue");
-                        return 127;
-                    }
+                    execvp(arg[0], arg);
                 default:
-                    waitpid(pid, &last_return_value, 0);
+                    wait(&stat);
+                    if (WIFEXITED(stat)) last_return_value = WEXITSTATUS(stat);
                     break;
             }
         }
