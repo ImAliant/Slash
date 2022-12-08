@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <signal.h>
+#include <fnmatch.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -99,6 +100,7 @@ int slash() {
         }
 
         if (strlen(line) > 0) add_history(line);
+        if (strlen(line) == 0) continue;
 
         char *cmd = malloc(100*sizeof(char));
         if (cmd == NULL) {
@@ -198,12 +200,55 @@ int slash() {
                     }
                     arg[i] = NULL;
 
-                    char *path = malloc(10*sizeof(arg[0]));
-                    if (path == NULL) {
-                        perror("malloc");
-                        return 1;
+                    int wildcard = 0;
+                    // Gestion wildcard
+                    for (int j = 0; j < i; j++) {
+                        if (strchr(arg[j], '*') != NULL) {
+                            wildcard = 1;
+                            // On veut parcourir le répertoire courant et appliqués la commande sur les fichiers correspondants.
+                            DIR *dir = opendir(".");
+                            if (dir == NULL) {
+                                perror("opendir");
+                                return 1;
+                            }
+                            struct dirent *ent;
+                            char **wildcard_arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+                            if (wildcard_arg == NULL) {
+                                perror("malloc");
+                                return 1;
+                            }
+                            for (int k = 0; k < MAX_ARGS_NUMBER; k++) {
+                                wildcard_arg[k] = malloc(100*sizeof(char));
+                                if (wildcard_arg[k] == NULL) {
+                                    perror("malloc");
+                                    return 1;
+                                }
+                            }
+                            wildcard_arg[0] = arg[0];
+                            int j = 1;
+                            while ((ent = readdir(dir)) != NULL) {
+                                // On veut obtenir le nom du fichier
+                                char *filename = ent->d_name;
+                                strcpy(wildcard_arg[j], filename);
+                                j++;
+                            }
+                            closedir(dir);
+                            wildcard_arg[j] = NULL;
+
+                            int stat2;
+                            if (fork() == 0) {
+                                execvp(arg[0], wildcard_arg);
+                            }
+                            else {
+                                wait(&stat2);
+                                if (WIFEXITED(stat2)) last_return_value = WEXITSTATUS(stat2);
+                            }
+                            break;
+                        }
                     }
-                    execvp(arg[0], arg);
+                    
+                    if (wildcard == 0)
+                        execvp(arg[0], arg);
                 default:
                     wait(&stat);
                     if (WIFEXITED(stat)) last_return_value = WEXITSTATUS(stat);
@@ -211,6 +256,7 @@ int slash() {
             }
         }
         
+        free(line_cpy);
         free(line);
         free(cmd);
         free(arg);
