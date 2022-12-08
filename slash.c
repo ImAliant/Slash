@@ -114,7 +114,7 @@ int slash() {
         char *ref = malloc(100*sizeof(char));
         if (ref == NULL) {
             perror("malloc");
-            return 1;
+            return 1; 
         }
         if (strstr(line,"echo")){ 
 			int stat;
@@ -123,15 +123,18 @@ int slash() {
 			   const char *argv[]={ "echo",line+5 };
 			  // argv[0]="echo";
 			 //  strcpy(argv[1],line+4);
+              
+             
 			   execvp(argv[0],argv);
-			}
+              
+            }
 			 else{
 				 wait(&stat);
 				 if (WIFEXITED(stat))
 				 last_return_value=WEXITSTATUS(stat);
 		     }
-		  }
-		  
+           }
+        
          else if (sscanf(line, "%s %s %s", cmd, arg, ref) == 3) {
             if (strcmp(cmd, "cd") == 0) {
                 last_return_value = cmd_cd(arg, ref);
@@ -194,8 +197,8 @@ int slash() {
 				  char *argv[2];
 				  argv[0]="ls";
 				  argv[1]=arg;
-				  last_return_value=execvp(argv[0],argv);
-			   }
+                  last_return_value=execvp(argv[0],argv);
+               }
 			   else {
 				   wait(&stat);
 				   last_return_value=WEXITSTATUS(stat);
@@ -210,6 +213,15 @@ int slash() {
             if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
             else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
             else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
+            else if (strcmp(cmd,"ls")==0) {
+                pid_t p = fork();
+                if(p==0){
+                    last_return_value=execlp("ls","ls",getenv("PWD"),NULL);
+                }else {
+					 wait(NULL);
+					 last_return_value=0;
+				 }
+            }
             else if (strstr(cmd, "true") != NULL){
 				pid_t r=fork();
 				if (r==0) {
