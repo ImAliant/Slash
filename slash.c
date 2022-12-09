@@ -202,53 +202,99 @@ int slash() {
 
                     int wildcard = 0;
                     // Gestion wildcard
-                    for (int j = 0; j < i; j++) {
+                    for (int j = 1; j < i; j++) {
                         if (strchr(arg[j], '*') != NULL) {
+                            // On a trouvé un wildcard
                             wildcard = 1;
-                            // On veut parcourir le répertoire courant et appliqués la commande sur les fichiers correspondants.
-                            DIR *dir = opendir(".");
-                            if (dir == NULL) {
-                                perror("opendir");
+
+                            // Si il y a d'autres arguments en plus du wildcard, on execute la commande sur les arguments correspondants.
+                            char **other_arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+                            if (other_arg == NULL) {
+                                perror("malloc");
                                 return 1;
                             }
+                            for (int k = 0; k < MAX_ARGS_NUMBER; k++) {
+                                other_arg[k] = malloc(100*sizeof(char));
+                                if (other_arg[k] == NULL) {
+                                    perror("malloc");
+                                    return 1;
+                                }
+                            }
+                            other_arg[0] = arg[0];
+                            int k = 1;
+                            for (int l = 1; l < i; l++) {
+                                if (strcmp(arg[l], "*") != 0) {
+                                    other_arg[k] = arg[l];
+                                    k++;
+                                }
+                            }
+                            other_arg[k] = NULL;
+
+                            if (k > 1) {
+                                int stat2;
+                                pid_t pid2 = fork();
+                                switch (pid2) {
+                                    case -1:
+                                        perror("fork");
+                                        return 1;
+                                    case 0:
+                                        execvp(other_arg[0], other_arg);
+                                    default:
+                                        wait(&stat2);
+                                        if (WIFEXITED(stat2)) last_return_value = WEXITSTATUS(stat2);
+                                        break;
+                                }
+                            }
+
+                            // On parcours ensuite le répertoire courant et on execute la commande sur les fichiers correspondants.
+                            DIR *dir = opendir(".");
                             struct dirent *ent;
                             char **wildcard_arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
                             if (wildcard_arg == NULL) {
                                 perror("malloc");
                                 return 1;
                             }
-                            for (int k = 0; k < MAX_ARGS_NUMBER; k++) {
-                                wildcard_arg[k] = malloc(100*sizeof(char));
-                                if (wildcard_arg[k] == NULL) {
+                            for (int w = 0; w < MAX_ARGS_NUMBER; w++) {
+                                wildcard_arg[w] = malloc(100*sizeof(char));
+                                if (wildcard_arg[w] == NULL) {
                                     perror("malloc");
                                     return 1;
                                 }
                             }
                             wildcard_arg[0] = arg[0];
-                            int j = 1;
-                            while ((ent = readdir(dir)) != NULL) {
+                            int w = 1;
+                            while ((ent = readdir(dir))) {
+                                if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+
                                 // On veut obtenir le nom du fichier
                                 char *filename = ent->d_name;
-                                strcpy(wildcard_arg[j], filename);
-                                j++;
+                                wildcard_arg[w] = filename;
+                                w++;
                             }
                             closedir(dir);
-                            wildcard_arg[j] = NULL;
+                            wildcard_arg[w] = NULL;
 
-                            int stat2;
-                            if (fork() == 0) {
-                                execvp(arg[0], wildcard_arg);
-                            }
-                            else {
-                                wait(&stat2);
-                                if (WIFEXITED(stat2)) last_return_value = WEXITSTATUS(stat2);
+                            int stat3;
+                            pid_t pid3 = fork();
+                            switch (pid3) {
+                                case -1:
+                                    perror("fork");
+                                    return 1;
+                                case 0:
+                                    execvp(wildcard_arg[0], wildcard_arg);
+                                default:
+                                    wait(&stat3);
+                                    if (WIFEXITED(stat3)) last_return_value = WEXITSTATUS(stat3);
+                                    break;
                             }
                             break;
                         }
                     }
+
                     
                     if (wildcard == 0)
                         execvp(arg[0], arg);
+                    exit(0);
                 default:
                     wait(&stat);
                     if (WIFEXITED(stat)) last_return_value = WEXITSTATUS(stat);
