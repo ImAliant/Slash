@@ -1,6 +1,6 @@
 CC = gcc
-DEPS = cmd_interne.h
-OBJ = cmd_interne.o slash.o
+DEPS = cmd_interne.h cmd_externe.h
+OBJ = cmd_externe.o cmd_interne.o slash.o
 
 %.o: %.c $(DEPS)
 	$(CC) -Wall -c -o $@ $< $(CFLAGS)

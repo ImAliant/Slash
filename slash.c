@@ -12,6 +12,7 @@
 #include <readline/history.h>
 
 #include "cmd_interne.h"
+#include "cmd_externe.h"
 
 #define GREEN   "\033[32m"
 #define RED     "\033[91m"
@@ -95,10 +96,12 @@ int slash() {
         
         if(!line) {
             free(line);
+            printf("exit\n");
             exit(last_return_value);
         }
 
         if (strlen(line) > 0) add_history(line);
+        if (strlen(line) == 0) continue;
 
         char *cmd = malloc(100*sizeof(char));
         if (cmd == NULL) {
@@ -169,48 +172,10 @@ int slash() {
             }
         }
         else {
-            int stat;
-            pid_t pid = fork();
-            switch (pid) {
-                case -1:
-                    perror("fork");
-                    return 1;
-                case 0:
-                    char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
-                    if (arg == NULL) {
-                        perror("malloc");
-                        return 1;
-                    }
-                    for (int i = 0; i < MAX_ARGS_NUMBER; i++) {
-                        arg[i] = malloc(100*sizeof(char));
-                        if (arg[i] == NULL) {
-                            perror("malloc");
-                            return 1;
-                        }
-                    }
-
-                    int i = 0;
-                    char *token = strtok(line, " ");
-                    while (token != NULL) {
-                        arg[i] = token;
-                        i++;
-                        token = strtok(NULL, " ");
-                    }
-                    arg[i] = NULL;
-
-                    char *path = malloc(10*sizeof(arg[0]));
-                    if (path == NULL) {
-                        perror("malloc");
-                        return 1;
-                    }
-                    execvp(arg[0], arg);
-                default:
-                    wait(&stat);
-                    if (WIFEXITED(stat)) last_return_value = WEXITSTATUS(stat);
-                    break;
-            }
+            last_return_value = handle_external_cmd(line);
         }
         
+        free(line_cpy);
         free(line);
         free(cmd);
         free(arg);
