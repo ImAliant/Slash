@@ -10,7 +10,13 @@ void exec_cmd(char **arg);
 
 int fork_exec(char **arg);
 
-int wildcard(int nb_args, char **arg);
+int find_and_exec_other_args(int nb_args, char **other_arg, char **arg);
+
+int wildcard_path_extension(int nb_args, char **arg, char *first_occ);
+
+int wildcard_extension(int nb_args, char **arg, char *first_occ);
+
+int wildcard_simple(int nb_args, char **arg);
 
 int handle_external_cmd(char *line);
 
