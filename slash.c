@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -11,6 +12,7 @@
 #include <readline/history.h>
 
 #include "cmd_interne.h"
+#include "cmd_externe.h"
 
 #define GREEN   "\033[32m"
 #define RED     "\033[91m"
@@ -65,7 +67,7 @@ void end() {
 }
 
 /*
- * Interpreteur de commande qui permet d'exécuter des commandes internes. 
+ * Interpreteur de commande qui permet d'exécuter des commandes internes et externes. 
  * Les différentes commandes internes sont :
  *        - exit
  *        - cd
@@ -84,20 +86,22 @@ int slash() {
         }
         char *color;
 
-        if (last_return_value == 1 || last_return_value == 127)
-            color = RED;
-        else
+        if (last_return_value == 0)
             color = GREEN;
+        else
+            color = RED;
 
         sprintf(prompt, "\001%s\002[%d]\001%s\002%s\001%s\002$ ", color, last_return_value, CYAN, cwd_prompt, DEFAULT);
         char *line = readline(prompt);
         
         if(!line) {
             free(line);
+            printf("exit\n");
             exit(last_return_value);
         }
 
         if (strlen(line) > 0) add_history(line);
+        if (strlen(line) == 0) continue;
 
         char *cmd = malloc(100*sizeof(char));
         if (cmd == NULL) {
@@ -115,42 +119,63 @@ int slash() {
             return 1;
         }
         
-        if (sscanf(line, "%s %s %s", cmd, arg, ref) == 3) {
-            if (strcmp(cmd, "cd") == 0) {
-                last_return_value = cmd_cd(arg, ref);
-            }
-        }
-        else if (sscanf(line, "%s %s", cmd, arg) == 2) {
-            if (strcmp(cmd, "pwd") == 0)
-                last_return_value = cmd_pwd(arg);
-            else if (strcmp(cmd, "cd") == 0) {
-                last_return_value = cmd_cd("", arg);
-            }
-            else if (strcmp(cmd, "exit") == 0) {
-                int val = atoi(arg);
+        // On teste si il s'agit d'une commande interne.
 
-                free(line);
-                free(cmd);
-                free(arg);
-                free(ref);
-                free(prompt);
+        char *cmd_interne[] = {"exit", "cd", "pwd"};
+        int bool_interne = 0;
+        char *line_cpy = strdup(line);
+        char *token = strtok(line_cpy, " ");
+        for(int i=0; i<3; i++) {
+            if (strcmp(token, cmd_interne[i]) == 0) {
+                bool_interne = 1;
+                break;
+            }
+        }
+        
 
-                return cmd_exit(val);
+        if (bool_interne == 1) {
+            if (sscanf(line, "%s %s %s", cmd, arg, ref) == 3) {
+                if (strcmp(cmd, "cd") == 0) {
+                    last_return_value = cmd_cd(arg, ref);
+                }
             }
-            else {
-                fprintf(stderr, "Commande inconnue: %s\n", cmd);
-                last_return_value = 127;
+            else if (sscanf(line, "%s %s", cmd, arg) == 2) {
+                if (strcmp(cmd, "pwd") == 0)
+                    last_return_value = cmd_pwd(arg);
+                else if (strcmp(cmd, "cd") == 0) {
+                    last_return_value = cmd_cd("", arg);
+                }
+                else if (strcmp(cmd, "exit") == 0) {
+                    int val = atoi(arg);
+
+                    free(line);
+                    free(cmd);
+                    free(arg);
+                    free(ref);
+                    free(prompt);
+
+                    return cmd_exit(val);
+                }
+                else {
+                    fprintf(stderr, "Commande inconnue: %s\n", cmd);
+                    last_return_value = 127;
+                }
+            }
+            else if (sscanf(line, "%s", cmd) == 1) {
+                if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
+                else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
+                else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
+                else {
+                    fprintf(stderr, "Commande inconnue: %s\n", cmd);
+                    last_return_value = 127;
+                }
             }
         }
-        else if (sscanf(line, "%s", cmd) == 1) {
-            if (strcmp(cmd, "exit") == 0) return cmd_exit(last_return_value);
-            else if (strcmp(cmd, "pwd") == 0) last_return_value = cmd_pwd("-L");
-            else if (strcmp(cmd, "cd") == 0) last_return_value = cmd_cd("", "");
-            else {
-                fprintf(stderr, "Commande inconnue: %s\n", cmd);
-                last_return_value = 127;
-            }
+        else {
+            last_return_value = handle_external_cmd(line);
         }
+        
+        free(line_cpy);
         free(line);
         free(cmd);
         free(arg);
@@ -170,3 +195,4 @@ int slash() {
 int main(int argc, char *argv[]) {
     return slash();
 }
+
