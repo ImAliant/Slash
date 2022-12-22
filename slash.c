@@ -8,11 +8,11 @@
 #include <dirent.h>
 #include <errno.h>
 #include <signal.h>
+#include <fnmatch.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-
+#include <fcntl.h>
 #include "cmd_interne.h"
-#include "cmd_externe.h"
 
 #define GREEN   "\033[32m"
 #define RED     "\033[91m"
@@ -96,7 +96,6 @@ int slash() {
         
         if(!line) {
             free(line);
-            printf("exit\n");
             exit(last_return_value);
         }
 
@@ -118,7 +117,68 @@ int slash() {
             perror("malloc");
             return 1;
         }
+        //chercher les symboles de redirection
+        char *input_redirect = strstr(line, "<");
+        char *output_redirect = strstr(line, ">");
+       // char *pipe_redirect = strstr(line, "|");
         
+        // cas d'un input redirect symbol
+        if (input_redirect) {
+            sscanf(line, "%s %s < %s", cmd, arg, ref);
+            // Ouvrir le fichier en lecture seule.
+            int input_fd = open(ref, O_RDONLY);
+            if (input_fd < 0) {
+                perror("open");
+                return 1;
+            }
+            // rediriger l'entrée standard de la commande vers le descripteur de fichier d'entrée.
+            if (dup2(input_fd, STDIN_FILENO) < 0) {
+                perror("dup2");
+                return 1;
+            }
+        // Close the input file descriptor.
+            close(input_fd);
+        }
+        // cas d'un output redirect symbol
+        else if (output_redirect) {
+            int append = 0;
+            int overwrite = 0;
+            if (strstr(line, ">>")) {
+                append = 1;
+            } 
+            else if (strstr(line, ">|")) {
+                overwrite = 1;
+            }
+            sscanf(line, "%s %s %s %s", cmd, arg, output_redirect, ref);
+            // Ouvrir le fichier en écriture seule. 
+                int output_fd;
+                if (append) {
+                    output_fd = open(ref, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+                }else if (overwrite) {
+                    output_fd = open(ref, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+                }else {
+                    output_fd = open(ref, O_WRONLY | O_EXCL | O_CREAT, S_IRUSR | S_IWUSR);
+                }
+                if (output_fd < 0) {
+                    perror("open");
+                    return 1;
+                }                   
+
+                // Rediriger la sortie standard de la commande vers le descripteur de fichier de sortie.
+                if (dup2(output_fd, STDOUT_FILENO) < 0) {
+                    perror("dup2");
+                    return 1;
+                }
+                  close(output_fd);
+        }
+    
+// Cas ou il n y a pas de redirection
+    else {
+    exec_cmd(cmd, arg);
+    return 0;
+}
+
+
         // On teste si il s'agit d'une commande interne.
 
         char *cmd_interne[] = {"exit", "cd", "pwd"};
@@ -172,7 +232,135 @@ int slash() {
             }
         }
         else {
-            last_return_value = handle_external_cmd(line);
+            int stat;
+            pid_t pid = fork();
+            switch (pid) {
+                case -1:
+                    perror("fork");
+                    return 1;
+                case 0:
+                    char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+                    if (arg == NULL) {
+                        perror("malloc");
+                        return 1;
+                    }
+                    for (int i = 0; i < MAX_ARGS_NUMBER; i++) {
+                        arg[i] = malloc(100*sizeof(char));
+                        if (arg[i] == NULL) {
+                            perror("malloc");
+                            return 1;
+                        }
+                    }
+
+                    int i = 0;
+                    char *token = strtok(line, " ");
+                    while (token != NULL) {
+                        arg[i] = token;
+                        i++;
+                        token = strtok(NULL, " ");
+                    }
+                    arg[i] = NULL;
+
+                    int wildcard = 0;
+                    // Gestion wildcard
+                    for (int j = 1; j < i; j++) {
+                        if (strchr(arg[j], '*') != NULL) {
+                            // On a trouvé un wildcard
+                            wildcard = 1;
+
+                            // Si il y a d'autres arguments en plus du wildcard, on execute la commande sur les arguments correspondants.
+                            char **other_arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+                            if (other_arg == NULL) {
+                                perror("malloc");
+                                return 1;
+                            }
+                            for (int k = 0; k < MAX_ARGS_NUMBER; k++) {
+                                other_arg[k] = malloc(100*sizeof(char));
+                                if (other_arg[k] == NULL) {
+                                    perror("malloc");
+                                    return 1;
+                                }
+                            }
+                            other_arg[0] = arg[0];
+                            int k = 1;
+                            for (int l = 1; l < i; l++) {
+                                if (strcmp(arg[l], "*") != 0) {
+                                    other_arg[k] = arg[l];
+                                    k++;
+                                }
+                            }
+                            other_arg[k] = NULL;
+
+                            if (k > 1) {
+                                int stat2;
+                                pid_t pid2 = fork();
+                                switch (pid2) {
+                                    case -1:
+                                        perror("fork");
+                                        return 1;
+                                    case 0:
+                                        execvp(other_arg[0], other_arg);
+                                    default:
+                                        wait(&stat2);
+                                        if (WIFEXITED(stat2)) last_return_value = WEXITSTATUS(stat2);
+                                        break;
+                                }
+                            }
+
+                            // On parcours ensuite le répertoire courant et on execute la commande sur les fichiers correspondants.
+                            DIR *dir = opendir(".");
+                            struct dirent *ent;
+                            char **wildcard_arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+                            if (wildcard_arg == NULL) {
+                                perror("malloc");
+                                return 1;
+                            }
+                            for (int w = 0; w < MAX_ARGS_NUMBER; w++) {
+                                wildcard_arg[w] = malloc(100*sizeof(char));
+                                if (wildcard_arg[w] == NULL) {
+                                    perror("malloc");
+                                    return 1;
+                                }
+                            }
+                            wildcard_arg[0] = arg[0];
+                            int w = 1;
+                            while ((ent = readdir(dir))) {
+                                if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+
+                                // On veut obtenir le nom du fichier
+                                char *filename = ent->d_name;
+                                wildcard_arg[w] = filename;
+                                w++;
+                            }
+                            closedir(dir);
+                            wildcard_arg[w] = NULL;
+
+                            int stat3;
+                            pid_t pid3 = fork();
+                            switch (pid3) {
+                                case -1:
+                                    perror("fork");
+                                    return 1;
+                                case 0:
+                                    execvp(wildcard_arg[0], wildcard_arg);
+                                default:
+                                    wait(&stat3);
+                                    if (WIFEXITED(stat3)) last_return_value = WEXITSTATUS(stat3);
+                                    break;
+                            }
+                            break;
+                        }
+                    }
+
+                    
+                    if (wildcard == 0)
+                        execvp(arg[0], arg);
+                    exit(0);
+                default:
+                    wait(&stat);
+                    if (WIFEXITED(stat)) last_return_value = WEXITSTATUS(stat);
+                    break;
+            }
         }
         
         free(line_cpy);
