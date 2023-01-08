@@ -228,11 +228,10 @@ int wildcard_path_extension(int nb_args, char **arg, char *first_occ) {
 int handle_external_cmd(char *line) {
     int stat;
     pid_t pid = fork();
-    switch (pid) {
-        case -1:
-            goto error_fork;
-        case 0:
-            char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+
+    if (pid == -1) goto error_fork;
+    if (pid == 0) {
+        char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
             if (!arg) goto error_malloc;
 
             for (int i = 0; i < MAX_ARGS_NUMBER; i++) {
@@ -274,16 +273,16 @@ int handle_external_cmd(char *line) {
             free(token);
 
             exit(0);
-            default:
-                wait(&stat);
-                if (command_not_found == 1) { 
-                    return_value = 127;
-                    command_not_found = 0;
-                }
-                else {
-                    if (WIFEXITED(stat)) return_value = WEXITSTATUS(stat);
-                }
-                break;
+    }
+    else {
+        waitpid(pid, &stat, 0);
+        if (command_not_found == 1) { 
+            return_value = 127;
+            command_not_found = 0;
+        }
+        else {
+            if (WIFEXITED(stat)) return_value = WEXITSTATUS(stat);
+        }
     }
 
     return return_value;
