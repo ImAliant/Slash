@@ -119,6 +119,59 @@ int slash() {
             return 1;
         }
         
+
+   // Split the input line into separate commands at the pipeline characters
+        char *commands[100];
+        int num_commands = 0;
+        char *command = strtok(line, "|");
+        while (command != NULL) {
+            commands[num_commands] = command;
+            num_commands++;
+            command = strtok(NULL, "|");
+        }
+        // Create a pipe for each pair of commands separated by a pipeline character
+        int pipes[num_commands - 1][2];
+        for (int i = 0; i < num_commands - 1; i++) {
+            if (pipe(pipes[i]) < 0) {
+                perror("pipe");
+                exit(1);
+            }
+        }
+        // Fork a child process for each command
+        int pid[num_commands];
+        for (int i = 0; i < num_commands; i++) {
+            pid[i] = fork();
+            if (pid[i] < 0) {
+                perror("fork");
+                exit(1);
+            }
+            if (pid[i] == 0) {
+                            // Child process
+                            // Redirect standard input or standard output to the read or write end of the appropriate pipe
+                            if (i > 0) {
+                                if (dup2(pipes[i-1][0], STDIN_FILENO) < 0) {
+                                    perror("dup2");
+                                    exit(1);
+                                }
+                                
+                            } if (i < num_commands - 1) {
+                                if (dup2(pipes[i][1], STDOUT_FILENO) < 0) {
+                                    perror("dup2");
+                                }
+                            }
+                       
+                            //Execution des commandes : 
+                            execvp(commands[i], commands[i]);
+                            perror("execvp");
+                            exit(1);
+                }else {
+                
+ // Parent process
+     
+                
+
+
+
         // On teste si il s'agit d'une commande interne.
 
         char *cmd_interne[] = {"exit", "cd", "pwd"};
@@ -184,10 +237,42 @@ int slash() {
 
         print_prompt();
     }
+        }
+       // Close all the pipes
+        for (int i = 0; i < num_commands - 1; i++) {
+            if (close(pipes[i][0]) < 0) {
+                perror("close");
+                exit(1);
+            }
+            if (close(pipes[i][1]) < 0) {
+                perror("close");
+                exit(1);
+            }
+        }
+
+                
+        
+// Wait for all child processes to finish
+       int status;
+        for (int i = 0; i < num_commands; i++) {
+          
+            if (waitpid(pid[i], &status, 0) < 0) {
+                perror("waitpid");
+                exit(1);
+            }
+            if (WIFEXITED(status)) {
+                last_return_value = WEXITSTATUS(status);
+            }
+        }
+
+
+
+        
     end();
 
     return last_return_value;
-}
+        
+    }}
 
 /*
  * Execute l'interpreteur de commande.
