@@ -4,15 +4,15 @@ Ce document décrit l'architecture de notre projet Slash de SY5.
 
 ## Vue d'ensemble
 
-|__ main
-|---|__ slash.c               (shell)
+|__ main  
+|----|__ slash.c               (shell)  
 |__ cmd                       (gère les commandes)  
-|---|__ cmd_externe           (gère les commandes externes)  
-|-------|__ cmd_externe.c  
-|-------|__ cmd_externe.h  
-|---|__ cmd_interne           (gère les commandes internes)  
-|-------|__ cmd_interne.c  
-|-------|__ cmd_interne.h  
+|----|__ cmd_externe           (gère les commandes externes)  
+|---------|__ cmd_externe.c  
+|---------|__ cmd_externe.h  
+|----|__ cmd_interne           (gère les commandes internes)  
+|---------|__ cmd_interne.c  
+|---------|__ cmd_interne.h  
 
 ## Détails
 ### Dossier courant
