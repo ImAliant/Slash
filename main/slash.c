@@ -106,6 +106,7 @@ int slash() {
         if (strlen(line) > 0) add_history(line);
         if (strlen(line) == 0) continue;
 
+        // REDIRECTION
         if (strstr(line, ">")  || strstr(line, "<") || 
             strstr(line, ">>") || strstr(line, ">|")||
             strstr(line, "2>") || strstr(line, "2>>") ||
@@ -147,7 +148,6 @@ int slash() {
             }
 
             file = strtok(NULL, " ");
-            fprintf(stderr, "cmd: %s, red: %s, file: %s,\n", cmd, red, file); 
             if (!file) {
                 fprintf(stderr, "bash: erreur de syntaxe près du symbole inattendu « newline »\n");
                 last_return_value = 1;
@@ -321,6 +321,7 @@ int slash() {
                        
                         free(line);
                         free(cmd);
+                        free(cmd_cpy);
                         free(cmd_no_args);
                         free(args);
                         free(ref);
@@ -382,6 +383,105 @@ int slash() {
                 return 1;
             }
         }
+        // PIPELINE
+        else if (strstr(line, "|")) {
+            // On compte le nombre de commande
+            int saved_stdout = dup(STDOUT_FILENO);
+            int saved_stdin = dup(STDIN_FILENO);
+
+            int num_commands = 0;
+            char *line_cpy = strdup(line);
+            char *token = strtok(line_cpy, "|");
+            while(token != NULL) {
+                num_commands++;
+                token = strtok(NULL, "|");
+            }
+            free(line_cpy);
+            // On recupere les commandes
+            char *commands[num_commands];
+            line_cpy = strdup(line);
+            token = strtok(line_cpy, "|");
+            int i = 0;
+            while(token != NULL) {
+                commands[i] = strdup(token);
+                i++;
+                token = strtok(NULL, "|");
+            }
+            free(line_cpy);
+
+            // On cree les pipes
+            int pipes[num_commands - 1][2];
+            for(int j = 0; j < num_commands -1; j++) {
+                if (pipe(pipes[j]) == -1) {
+                    perror("pipe");
+                    return 1;
+                }
+            }
+
+            // On cree les fils
+            int pid[num_commands];
+
+            for(int z = 0; z < num_commands; z++) {
+                pid[z] = fork();
+                if (pid[z] < 0) {
+                    perror("fork");
+                    exit(EXIT_FAILURE);
+                }
+                if (pid[z] == 0) {
+                    dup2(pipes[z][1], STDOUT_FILENO);
+                    close(pipes[z][0]);
+                    close(pipes[z][1]);
+
+                    char **args = malloc(sizeof(char*) * 100);
+                    token = strtok(commands[z], " ");
+                    int i = 0;
+                    while(token != NULL) {
+                        args[i] = strdup(token);
+                        i++;
+                        token = strtok(NULL, " ");
+                    }
+                    args[i] = NULL;
+
+                    if (execvp(args[0], args) == -1) {
+                        perror("execvp");
+                        last_return_value = 127;
+                    }
+                }
+
+                dup2(pipes[z][0], STDIN_FILENO);
+                close(pipes[z][0]);
+                close(pipes[z][1]);
+
+                waitpid(pid[z], NULL, 0);
+            }
+
+            for(int j = 0; j < num_commands - 1; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            for(int j = 0; j < num_commands; j++) {
+                free(commands[j]);
+            }
+
+            if (dup2(saved_stdout, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                return 1;
+            }
+            if (close(saved_stdout) == -1) {
+                perror("close");
+                return 1;
+            }
+            if (dup2(saved_stdin, STDIN_FILENO) == -1) {
+                perror("dup2");
+                return 1;
+            }
+            if (close(saved_stdin) == -1) {
+                perror("close");
+                return 1;
+            }
+        }
+        // COMMANDE SIMPLE
         else {
             char *cmd = malloc(100*sizeof(char));
             if (cmd == NULL) {
