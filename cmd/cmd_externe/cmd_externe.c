@@ -228,62 +228,55 @@ int wildcard_path_extension(int nb_args, char **arg, char *first_occ) {
 int handle_external_cmd(char *line) {
     int stat;
     pid_t pid = fork();
-    switch (pid) {
-        case -1:
-            goto error_fork;
-        case 0:
-            char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
-            if (!arg) goto error_malloc;
-
-            for (int i = 0; i < MAX_ARGS_NUMBER; i++) {
-                arg[i] = malloc(100*sizeof(char));
-                if (!arg[i]) goto error_malloc;
+    if (pid == -1) goto error_fork;
+    if (pid == 0) {
+        char **arg = malloc(MAX_ARGS_NUMBER*sizeof(char*));
+        if (!arg) goto error_malloc;
+        for (int i = 0; i < MAX_ARGS_NUMBER; i++) {
+            arg[i] = malloc(100*sizeof(char));
+            if (!arg[i]) goto error_malloc;
+        }
+        int i = 0;
+        char *token = strtok(line, " ");
+        while (token != NULL) {
+            arg[i] = token;
+            i++;
+            token = strtok(NULL, " ");
+        }
+        arg[i] = NULL;
+        int wildcard_bool = 0;
+        for (int j = 0; j < i; j++) {
+            char *ptr;
+            if ((ptr = strstr(arg[j], "/*.")) != NULL) {
+                wildcard_bool = 1;
+                wildcard_path_extension(i, arg, ptr);
             }
-
-            int i = 0;
-            char *token = strtok(line, " ");
-            while (token != NULL) {
-                arg[i] = token;
-                i++;
-                token = strtok(NULL, " ");
+            else if ((ptr = strstr(arg[j], "*.")) != NULL) {
+                wildcard_bool = 1;
+                wildcard_extension(i, arg, ptr);
             }
-            arg[i] = NULL;
-
-            int wildcard_bool = 0;
-            for (int j = 0; j < i; j++) {
-                char *ptr;
-                if ((ptr = strstr(arg[j], "/*.")) != NULL) {
-                    wildcard_bool = 1;
-                    wildcard_path_extension(i, arg, ptr);
-                }
-                else if ((ptr = strstr(arg[j], "*.")) != NULL) {
-                    wildcard_bool = 1;
-                    wildcard_extension(i, arg, ptr);
-                }
-                else if (strchr(arg[j], '*') != NULL) {
-                    wildcard_bool = 1;
-                    wildcard_simple(i, arg);
-                }
+            else if (strchr(arg[j], '*') != NULL) {
+                wildcard_bool = 1;
+                wildcard_simple(i, arg);
             }
-                    
-            if (wildcard_bool == 0) {
-                exec_cmd(arg);
-            }
-
-            free(arg);
-            free(token);
-
-            exit(0);
-            default:
-                wait(&stat);
-                if (command_not_found == 1) { 
-                    return_value = 127;
-                    command_not_found = 0;
-                }
-                else {
-                    if (WIFEXITED(stat)) return_value = WEXITSTATUS(stat);
-                }
-                break;
+        }
+                
+        if (wildcard_bool == 0) {
+            exec_cmd(arg);
+        }
+        free(arg);
+        free(token);
+        exit(0);
+    }
+    else {
+        waitpid(pid, &stat, 0);
+        if (command_not_found == 1) { 
+            return_value = 127;
+            command_not_found = 0;
+        }
+        else {
+            if (WIFEXITED(stat)) return_value = WEXITSTATUS(stat);
+        }
     }
 
     return return_value;
