@@ -12,8 +12,8 @@
 #include <readline/history.h>
 #include <fcntl.h>
 
-#include "cmd/cmd_interne/cmd_interne.h"
-#include "cmd/cmd_externe/cmd_externe.h"
+#include "../cmd/cmd_interne/cmd_interne.h"
+#include "../cmd/cmd_externe/cmd_externe.h"
 
 #define GREEN   "\033[32m"
 #define RED     "\033[91m"
